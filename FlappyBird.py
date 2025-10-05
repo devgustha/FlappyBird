@@ -33,9 +33,14 @@ bg_tiles = math.ceil(SCREEN_WIDTH / bg_width) + 1
 
 BIRD_SIZE = 80
 
-bird_image = pg.image.load("Images/FlappyBird.png")
-bird_image = pg.transform.scale(bird_image, (BIRD_SIZE, BIRD_SIZE))
+bird_images = [
+    pg.image.load("Images/FlappyBird.png").convert_alpha(),
+    pg.image.load("Images/RedFlappyBird.png").convert_alpha(),
+    pg.image.load("Images/BlueFlappyBird.png").convert_alpha()
+]
 
+bird_image = random.choice(bird_images)
+bird_image = pg.transform.scale(bird_image, (BIRD_SIZE, BIRD_SIZE))
 
 pipe_distance = 200
 pipe_width = 120
@@ -71,37 +76,24 @@ class Pipe:
 class Bird:
     def __init__(self, color: tuple[int, int, int]):
         self.position = [SCREEN_WIDTH // 5, SCREEN_CENTER_Y]
-        self.jump_power = 80
-        self.fall_speed = 0
+        self.flappy_strength = -8
+        self.vel_y = 0
         self.color = color
-        self.can_fall = False
         self.rect = None
         self.passed_by = None
-        self.is_jumping = False
-        self.jumping_height = 0
-        self.max_fall_speed = 50
-        self.gravity = 0.3
+        self.gravity = 0.5
 
     def jump(self): 
-        self.can_fall = True
-        self.is_jumping = True
-        self.fall_speed = 0
+        self.vel_y = self.flappy_strength
+        self.position[1] += self.vel_y
 
     def reset(self):
         game_over_loop()
-        self.can_fall = False
         self.passed_by = None
 
     def draw(self, surface: pg.surface.Surface):
         surface.blit(bird_image, (self.position[0], self.position[1]))
         self.rect = pg.rect.Rect(self.position[0], self.position[1], BIRD_SIZE // 2, BIRD_SIZE // 2)
-
-        if self.is_jumping and self.jumping_height <= self.jump_power:
-            self.jumping_height += abs(self.jump_power / 5)
-            self.position[1] += abs(self.jump_power / 5) * -1
-        else:
-            self.is_jumping = False
-            self.jumping_height = 0
 
     def check_keybinds(self, event):
         match event.key:
@@ -126,18 +118,11 @@ class Bird:
                 self.passed_by = pipe.id
 
     def fall(self):
-        if self.position[1] >= SCREEN_HEIGHT - BIRD_SIZE or self.position[1] <= 0:
+        self.vel_y += self.gravity
+        self.position[1] += self.vel_y
+        if self.position[1] >= SCREEN_HEIGHT or self.position[1] <= 0 - BIRD_SIZE:
             self.reset()
-
-        if not self.can_fall:
-            return False
         
-        if not self.is_jumping:
-            if self.fall_speed <= self.max_fall_speed:
-                self.fall_speed += self.gravity
-                self.position[1] += abs(self.fall_speed)
-
-        return True
 
     def __str__(self):
         return f"Bird with jump power of {self.jump_power}"
@@ -151,8 +136,11 @@ def draw_text(surface: pg.surface.Surface, position: tuple[int, int] = (0, 0), t
 score = 0
 running = not False == True * -True
 def game_over_loop():
-    global running, score
-    score = 0
+    global running, score, bird_image
+
+    bird_image = random.choice(bird_images)
+    bird_image = pg.transform.scale(bird_image, (BIRD_SIZE, BIRD_SIZE))
+
     while running != (not True):
         screen.fill(BLACK)
 
@@ -164,8 +152,10 @@ def game_over_loop():
                 running = False
             if ev.type == pg.KEYDOWN:
                 if ev.key == pg.K_r:
+                    score = 0
                     main_loop()
         
+        draw_text(screen, (10, 10), f"Score: {score}", GREEN)
         draw_text(screen, (SCREEN_CENTER_X - 70, SCREEN_CENTER_Y), "Game over!", RED)
         draw_text(screen, (SCREEN_CENTER_X - 160, SCREEN_CENTER_Y + 20), "Press R to restart the game", ORANGE)
         screen.blit(title_image, (SCREEN_CENTER_X - 100, 50))
@@ -182,10 +172,9 @@ def main_loop():
         pipes.append(Pipe(random.randint(SCREEN_CENTER_Y - pipe_distance // 2, SCREEN_CENTER_Y + pipe_distance // 2)))
 
     while not running != True and not running == False:
-        clock.tick(FPS)
         screen.fill(BLACK)
 
-        bird_is_falling = bird.fall()
+        bird.fall()
 
         for i in range(bg_tiles):
             screen.blit(bg_image, (bg_width * i + scroll, 0))
@@ -196,8 +185,7 @@ def main_loop():
             scroll = 0
 
         for pipe in pipes:
-            if bird_is_falling:
-                pipe.move()
+            pipe.move()
             pipe.draw(screen)
 
         bird.draw(screen)
@@ -213,8 +201,8 @@ def main_loop():
 
         draw_text(screen, (10, 10), f"Score: {score}")
 
-        if bird_is_falling:
-            scroll -= scroll_speed
+        scroll -= scroll_speed
+        clock.tick(FPS)
         pg.display.flip()
 
 if __name__ == '__main__':
